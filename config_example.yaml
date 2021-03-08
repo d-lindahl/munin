@@ -1,0 +1,16 @@
+timeout: 600
+frequency: 300
+interfaces:
+  - eth0
+  - eth1
+containers:
+  container-one:
+    ports:
+      - port: 4567
+        protocol: udp
+      - port: 4568
+        protocol: udp
+  container-two:
+    ports:
+      - port: 5678
+        protocol: tcp
