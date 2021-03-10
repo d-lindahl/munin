@@ -6,7 +6,7 @@ This is suitable for UDP-based protocols and will probably not work very well fo
 * As soon as any packet is sent to the associated ports the container is unpaused
 * It has been tested with Valheim dedicated server.**
 
-** Note that, in the case of Valheim, the server of course wont be able to listen to any external status queries unless you're monitoring the query port as well in which case the container will probably be awake most of the time anyway.  
+** Note that, in the case of Valheim, the server of course wont be able to listen to any external status queries unless you're monitoring the query port as well in which case the container will probably be awake most of the time anyway. This means it'll only work if users connect by ip directly.
 
 
 #### Parameters
