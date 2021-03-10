@@ -34,7 +34,7 @@ containers:
       - port: 5678
         protocol: tcp
 ```
-* Timeout - Time in seconds until the container is paused. Default 10 minutes.
+* Timeout - Time in seconds until the container is considered inactive. Default 10 minutes.
 * Frequency - How often to check if a container has timed out. Default every 5 minutes.
 * Interfaces - List of interfaces to listen on. Leave out for all interfaces.
 * Containers - Docker container names with associated ports and protocols
