@@ -1,0 +1,4 @@
+netifaces==0.10.4
+pyshark==0.4.3
+docker==4.1.0
+PyYAML==5.3.1

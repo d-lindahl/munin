@@ -1,3 +1,4 @@
+import netifaces
 import signal
 import sys
 import time
@@ -19,7 +20,9 @@ class Munin:
         self.verbose = False
         self.timeout = 600
         self.frequency = 300
-        self.interfaces = ['eth0']
+        # Seems pyshark (or tshark) doesn't handle None as interface very well.
+        # Should mean all interfaces according to doc
+        self.interfaces = netifaces.interfaces()
         self.ignore_starting = True
         self.containers = {}
         self.port_to_container_dict = {}
@@ -40,11 +43,12 @@ class Munin:
         self.set_if_present(config, 'ignore_starting')
         self.containers = {}
         self.port_to_container_dict = {}
+        client = docker.from_env()
         for container_name, container_ports in config['containers'].items():
             container_dict = {
                 'name': container_name,
                 'ports': container_ports['ports'],
-                'instance': docker.from_env().containers.get(container_name),
+                'instance': client.containers.get(container_name),
                 'paused': False,
                 'last_packet': 0
             }
@@ -58,43 +62,50 @@ class Munin:
 
     def update(self, pkt):
         if self.lock.acquire(blocking=False):
-            port = pkt.info.split(' ')[2]
-            container_name = self.port_to_container_dict[int(port)]
-            container = self.containers[container_name]
-            container['last_packet'] = time.time()
-            if container['paused']:
-                print(f"{container_name}: Packet arriving! Waking up the container!")
-                container['instance'].unpause()
-                container['paused'] = False
-            self.lock.release()
+            try:
+                port = pkt.info.split(' ')[2]
+                container_name = self.port_to_container_dict[int(port)]
+                container = self.containers[container_name]
+                container['last_packet'] = time.time()
+                if container['paused']:
+                    print(f"{container_name}: Packet arriving! Waking up the container!")
+                    container['instance'].unpause()
+                    container['paused'] = False
+            finally:
+                self.lock.release()
 
     def check(self):
         self.lock.acquire()
-        print('Munin is surveying the land:')
-        for container_data in self.containers.values():
-            print(f"{container_data['name']}: ", end='')
-            if self.ignore_starting and Munin.health(container_data['name']) == 'starting':
-                print('Container is starting, skipping.')
-            else:
-                container_data['instance'].reload()
-                status = container_data['instance'].status
-                time_since_last_packet = time.time() - container_data['last_packet']
-                if status == 'running':
-                    if time_since_last_packet > self.timeout:
-                        print(f'No packets received for {round(time_since_last_packet)}s. Pausing the container.')
-                        container_data['instance'].pause()
-                        container_data['paused'] = True
-                    else:
-                        print('Container is active')
-                elif status == 'paused':
-                    print('Container is paused')
-                elif status == 'exited':
-                    print('Container has exited')
-                elif status == 'restarting':
-                    print('Container is restarting')
-        self.timer = Timer(self.frequency, self.check)
-        self.timer.start()
-        self.lock.release()
+        try:
+            print('Munin is surveying the land:')
+            for container_data in self.containers.values():
+                print(f"{container_data['name']}: ", end='')
+                if self.ignore_starting and Munin.health(container_data['name']) == 'starting':
+                    print('Container is starting, skipping.')
+                else:
+                    container_data['instance'].reload()
+                    status = container_data['instance'].status
+                    since_last_packet = time.time() - container_data['last_packet']
+                    if status == 'running':
+                        if since_last_packet > self.timeout:
+                            if container_data['last_packet'] == 0:
+                                print(f'No packets received since Munin launched. Pausing the container.')
+                            else:
+                                print(f'No packets received for {round(since_last_packet)}s. Pausing the container.')
+                            container_data['instance'].pause()
+                            container_data['paused'] = True
+                        else:
+                            print('Container is active')
+                    elif status == 'paused':
+                        print('Container is paused')
+                    elif status == 'exited':
+                        print('Container has exited')
+                    elif status == 'restarting':
+                        print('Container is restarting')
+            self.timer = Timer(self.frequency, self.check)
+            self.timer.start()
+        finally:
+            self.lock.release()
 
     def start(self):
         print('Munin has arrived!')

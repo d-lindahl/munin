@@ -1,0 +1,9 @@
+version: "3"
+services:
+  munin:
+    image: quaan/munin:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}/config.yaml:/config/munin.yaml
+    network: host
